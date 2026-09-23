@@ -22,7 +22,16 @@ def planning():
    res = make_response(jsonify(schedule), 200)
    return res
 
+
 # Route 2 (GET) : Films programmés à une date (/schedule/<date>)
+# Test : GET http://localhost:3202/schedule/20151201
+@app.route("/schedule/<date>", methods=['GET'])
+def film_selon_date(date):
+    for s in schedule:
+        if str(s["date"]) == str(date):
+            return make_response(jsonify(s), 200)
+    return make_response(jsonify({"error": "Aucune programmation à cette date"}), 404)
+
 
 
 # Route 3 (GET) : Dates où passent passe le film (/moviedates/<movieid>)
