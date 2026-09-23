@@ -35,6 +35,16 @@ def film_selon_date(date):
 
 
 # Route 3 (GET) : Dates où passent passe le film (/moviedates/<movieid>)
+# Test : GET http://localhost:3202/moviedates/a8034f44-aee4-44cf-b32c-74cf452aaaae
+@app.route("/moviedates/<movieid>", methods=['GET'])
+def date_selon_film(movieid):
+    dates = []
+    for s in schedule:
+        if movieid in s["movies"]:
+            dates.append(s["date"])
+    if not dates:
+        return make_response(jsonify({"error": "Ce film ne passe à aucune date"}), 404)
+    return make_response(jsonify(dates), 200)
 
 
 # Route 4 (POST) : Ajouter une date et ses films (/schedule/<date>)
