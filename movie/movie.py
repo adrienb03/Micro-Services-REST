@@ -23,11 +23,6 @@ def write(movies):
 def home():
     return make_response("<h1 style='color:blue'>Welcome to the Movie service!</h1>",200)
 
-if __name__ == "__main__":
-    #p = sys.argv[1]
-    print("Server running in port %s"%(PORT))
-    app.run(host=HOST, port=PORT)
-
 # get all movies
 @app.route("/json", methods=['GET'])
 def get_json():
@@ -70,3 +65,8 @@ def del_movie(movieid):
 
     res = make_response(jsonify({"error":"movie ID not found"}),500)
     return res
+
+if __name__ == "__main__":
+    #p = sys.argv[1]
+    print("Server running in port %s"%(PORT))
+    app.run(host=HOST, port=PORT)
