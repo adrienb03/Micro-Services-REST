@@ -55,6 +55,21 @@ def date_selon_film(movieid):
 
 
 # Route 4 (POST) : Ajouter une date et ses films (/schedule/<date>)
+# Test url : http://localhost:3202/schedule/20151231 
+# Test body : {"date": "20151231", "movies": ["720d006c-3a57-4b6a-b18f-9b713b073f3c"]}
+# Nettoyage :git restore databases/times.json
+@app.route("/schedule/<date>", methods=['POST'])
+def ajout_date(date):
+    req = request.get_json()
+
+    for s in schedule:
+        if str(s["date"]) == str(date):
+            return make_response(jsonify({"error": "cette date existe déjà"}), 409)
+
+    schedule.append(req)
+    write(schedule)
+    return make_response(jsonify({"message": "date ajoutée"}), 201)
+
 
 
 # Route 5 (DELETE) : Supprimer une date (/schedule/<date>)
