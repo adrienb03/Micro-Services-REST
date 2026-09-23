@@ -26,8 +26,17 @@ def get_json():
     res = make_response(jsonify(users), 200)
     return res
 
+# get user by id
+@app.route("/users/<userid>", methods=['GET'])
+def get_user_by_id(userid):
+    for user in users:
+        if str(user["id"]) == str(userid):
+            res = make_response(jsonify(user),200)
+            return res
+    return make_response(jsonify({"error":"User ID not found"}),500)
+
 @app.route("/users/<userid>", methods=['POST'])
-def add_user_to_movie(userid):
+def add_user(userid):
     req = request.get_json()
 
     for user in users:
