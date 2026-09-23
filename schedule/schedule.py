@@ -10,6 +10,13 @@ HOST = '0.0.0.0'
 with open('{}/databases/times.json'.format("."), "r") as jsf:
    schedule = json.load(jsf)["schedule"]
 
+def write(schedule):
+    with open('{}/databases/times.json'.format("."), 'w') as f:
+        full = {}
+        full['schedule'] = schedule
+        json.dump(full, f)
+
+
 @app.route("/", methods=['GET'])
 def home():
    return "<h1 style='color:blue'>Welcome to the Showtime service!</h1>"
