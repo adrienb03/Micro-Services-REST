@@ -73,6 +73,15 @@ def ajout_date(date):
 
 
 # Route 5 (DELETE) : Supprimer une date (/schedule/<date>)
+# Test : DELETE http://localhost:3202/schedule/20151231
+@app.route("/schedule/<date>", methods=['DELETE'])
+def suppression_date(date):
+    for s in schedule:
+        if str(s["date"]) == str(date):
+            schedule.remove(s)
+            write(schedule)
+            return make_response(jsonify({"message": "date supprimée"}), 200)
+    return make_response(jsonify({"error": "cette date n'existe pas"}), 404)
 
 
 
