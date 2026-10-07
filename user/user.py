@@ -3,7 +3,7 @@ import requests
 import json
 from werkzeug.exceptions import NotFound
 
-from flask_jwt_extended import create_access_token, get_jwt_identity, JWTManager
+from flask_jwt_extended import create_access_token, get_jwt_identity, JWTManager, jwt_required
 
 app = Flask(__name__)
 
@@ -44,6 +44,24 @@ def login():
     access_token = create_access_token(identity=user["id"])
     # 4. Renvoi du token créé
     return make_response(jsonify({"access_token": access_token}), 200)
+
+@app.route("/user/<username>", methods=["GET"])
+@jwt_required()
+def infos(username):
+    # 1. Récuperer l'identité jwt
+    current_user_id = get_jwt_identity()
+    # 2. Vérifier si le username de l'utilisateur demandé correspond bien à celui du jwt
+    user = None
+    for u in users:
+        if u["id"] == current_user_id and u["name"] == username:
+            user = u
+            break
+    if user is None:
+        return make_response(jsonify({"error": "User not found or unauthorized"}), 404)
+    # 3. Récupérer les infos de l'utilisateur
+    user_info = user
+    # 4. Renvoyer en JSON
+    return make_response(jsonify(user_info), 200)
 
 @app.route("/users/json", methods=['GET'])
 def get_json():
