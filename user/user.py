@@ -3,7 +3,13 @@ import requests
 import json
 from werkzeug.exceptions import NotFound
 
+from flask_jwt_extended import create_access_token, get_jwt_identity, JWTManager
+
 app = Flask(__name__)
+
+# Initialisation de la partie JWT
+app.config["JWT_SECRET_KEY"] = "super-secret"
+jwt = JWTManager(app)
 
 PORT = 3203
 HOST = '0.0.0.0'
@@ -20,6 +26,24 @@ def write(users):
 @app.route("/", methods=['GET'])
 def home():
    return "<h1 style='color:blue'>Welcome to the User service!</h1>"
+
+# Route d'authentification
+@app.route("/login", methods=["POST"])
+def login():
+    # 1. Recuperer dans la requête le nom de l'utilisateur qui souhaite se connecter
+    username = request.get_json().get("username")
+    # 2. Valider que l'utilisateur existe bien
+    user = None
+    for u in users:
+        if u["name"] == username:
+            user = u
+            break
+    if user is None:
+        return make_response(jsonify({"error": "User not found"}), 404)
+    # 3. Création d'un token d'accès JWT
+    access_token = create_access_token(identity=user["id"])
+    # 4. Renvoi du token créé
+    return make_response(jsonify({"access_token": access_token}), 200)
 
 @app.route("/users/json", methods=['GET'])
 def get_json():
