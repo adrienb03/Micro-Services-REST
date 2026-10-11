@@ -10,18 +10,18 @@ HOST = '0.0.0.0'
 with open('{}/databases/times.json'.format("."), "r") as jsf:
    schedule = json.load(jsf)["schedule"]
 
+with open('{}./movie/databases/movies.json'.format("."), "r") as jsf:
+   movies = json.load(jsf)["movies"]
+
 def write(schedule):
     with open('{}/databases/times.json'.format("."), 'w') as f:
         full = {}
         full['schedule'] = schedule
         json.dump(full, f)
 
-
 @app.route("/", methods=['GET'])
 def home():
    return "<h1 style='color:blue'>Welcome to the Showtime service!</h1>"
-
-
 
 # Route 1 (GET) : Tout le planning (/json)
 @app.route("/json", methods=['GET'])
@@ -29,8 +29,7 @@ def planning():
    res = make_response(jsonify(schedule), 200)
    return res
 
-
-# Route 2 (GET) : Films programmés à une date (/schedule/<date>)
+# Route 2 (GET) : Le schedule associé à une date (/schedule/<date>)
 # Test : GET http://localhost:3202/schedule/20151201
 @app.route("/schedule/<date>", methods=['GET'])
 def film_selon_date(date):
@@ -38,8 +37,6 @@ def film_selon_date(date):
         if str(s["date"]) == str(date):
             return make_response(jsonify(s), 200)
     return make_response(jsonify({"error": "Aucune programmation à cette date"}), 404)
-
-
 
 # Route 3 (GET) : Dates où passent passe le film (/moviedates/<movieid>)
 # Test : GET http://localhost:3202/moviedates/a8034f44-aee4-44cf-b32c-74cf452aaaae
@@ -55,8 +52,8 @@ def date_selon_film(movieid):
 
 
 # Route 4 (POST) : Ajouter une date et ses films (/schedule/<date>)
-# Test url : http://localhost:3202/schedule/20151231 
-# Test body : {"date": "20151231", "movies": ["720d006c-3a57-4b6a-b18f-9b713b073f3c"]}
+# Test url : http://localhost:3202/schedule/20151230
+# Test body : {"date": "20151230", "movies": ["720d006c-3a57-4b6a-b18f-9b713b073f3c"]}
 # Nettoyage :git restore databases/times.json
 @app.route("/schedule/<date>", methods=['POST'])
 def ajout_date(date):
@@ -65,6 +62,14 @@ def ajout_date(date):
     for s in schedule:
         if str(s["date"]) == str(date):
             return make_response(jsonify({"error": "cette date existe déjà"}), 409)
+
+    # Check if all movie IDs exist in movies.json
+    for movie_id in req["movies"]:
+        if not any(movie["id"] == movie_id for movie in movies):
+            return make_response(
+                jsonify({"error": f"Movie {movie_id} not found"}),
+                400
+            )
 
     schedule.append(req)
     write(schedule)
@@ -84,6 +89,24 @@ def suppression_date(date):
     return make_response(jsonify({"error": "cette date n'existe pas"}), 404)
 
 
+# Additional endpoint number 3/3
+# Get scheduled movies for a date with their details
+@app.route("/schedule/<date>/details", methods=["GET"])
+def get_schedule_details(date):
+    for s in schedule:
+        if s["date"] == date:
+            result = {
+                "date": s["date"],
+                "movies": []
+            }
+            for movie_id in s["movies"]:
+                for movie in movies:
+                    if movie["id"] == movie_id:
+                        result["movies"].append(movie)
+                        break
+            return make_response(jsonify(result), 200)
+
+    return make_response(jsonify({"error": "Schedule not found"}), 404)
 
 if __name__ == "__main__":
    print("Server running in port %s"%(PORT))
