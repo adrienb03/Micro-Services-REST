@@ -39,7 +39,12 @@ def home():
    return "<h1 style='color:blue'>Welcome to the Booking service!</h1>"
 
 @app.route("/bookings/json", methods=['GET'])
-def get_json():
+@jwt_required()
+def get_bookings():
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     res = make_response(jsonify(bookings), 200)
     return res
 
@@ -62,7 +67,13 @@ def get_booking_by_id(userid):
 
 # Post a new booking for a user
 @app.route("/bookings/<userid>", methods=["POST"])
+@jwt_required()
 def add_booking(userid):
+    current_user_id = get_jwt_identity()
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin and current_user_id != userid:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+
     req = request.get_json()
     dates = req["dates"]
 
@@ -97,20 +108,32 @@ def add_booking(userid):
 
 # Delete a booking
 @app.route("/bookings/<userid>", methods=['DELETE'])
+@jwt_required()
 def del_booking(userid):
+    current_user_id = get_jwt_identity()
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin and current_user_id != userid:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     for booking in bookings:
         if str(booking["userid"]) == str(userid):
             bookings.remove(booking)
             write(bookings)
             return make_response(jsonify(booking),200)
 
-    res = make_response(jsonify({"error":"booking ID not found"}),500)
+    res = make_response(jsonify({"error":"booking ID not found"}),404)
     return res
 
 # Additional endpoint number 1/3
 # get bookings by user id and return the movies with their details
 @app.route("/bookings/<userid>/details", methods=['GET'])
+@jwt_required()
 def get_schedules_by_userid(userid):
+   current_user_id = get_jwt_identity()
+   is_admin = get_jwt().get("admin", False)
+   if not is_admin and current_user_id != userid:
+        return make_response(jsonify({"error": "Forbidden"}), 403) 
+             
    for booking in bookings:
       if str(booking["userid"]) == str(userid):
          result = {
@@ -135,7 +158,13 @@ def get_schedules_by_userid(userid):
 # Additional endpoint number 2/3
 # Get booking with user details
 @app.route("/bookings/<userid>/userdetail", methods=["GET"])
+@jwt_required()
 def get_booking_with_user(userid):
+    current_user_id = get_jwt_identity()
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin and current_user_id != userid:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     for booking in bookings:
         if booking["userid"] == userid:
             for user in users:
