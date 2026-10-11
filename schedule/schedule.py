@@ -1,8 +1,16 @@
 from flask import Flask, render_template, request, jsonify, make_response
 import json
 from werkzeug.exceptions import NotFound
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
 app = Flask(__name__)
+
+# JWT configuration
+app.config["JWT_SECRET_KEY"] = "super-secret"
+app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
+app.config["JWT_COOKIE_SECURE"] = False
+
+jwt = JWTManager(app)
 
 PORT = 3202
 HOST = '0.0.0.0'
@@ -56,7 +64,12 @@ def date_selon_film(movieid):
 # Test body : {"date": "20151230", "movies": ["720d006c-3a57-4b6a-b18f-9b713b073f3c"]}
 # Nettoyage :git restore databases/times.json
 @app.route("/schedule/<date>", methods=['POST'])
+@jwt_required()
 def ajout_date(date):
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     req = request.get_json()
 
     for s in schedule:
@@ -80,7 +93,12 @@ def ajout_date(date):
 # Route 5 (DELETE) : Supprimer une date (/schedule/<date>)
 # Test : DELETE http://localhost:3202/schedule/20151231
 @app.route("/schedule/<date>", methods=['DELETE'])
+@jwt_required()
 def suppression_date(date):
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     for s in schedule:
         if str(s["date"]) == str(date):
             schedule.remove(s)
