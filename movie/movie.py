@@ -2,15 +2,22 @@ from flask import Flask, request, jsonify, make_response
 import json
 import sys
 from werkzeug.exceptions import NotFound
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
 app = Flask(__name__)
+
+# JWT configuration
+app.config["JWT_SECRET_KEY"] = "super-secret"
+app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
+app.config["JWT_COOKIE_SECURE"] = False
+
+jwt = JWTManager(app)
 
 PORT = 3200
 HOST = '0.0.0.0'
 
 with open('{}/databases/movies.json'.format("."), 'r') as jsf:
     movies = json.load(jsf)["movies"]
-    print(movies)
 
 def write(movies):
     with open('{}/databases/movies.json'.format("."), 'w') as f:
@@ -36,34 +43,44 @@ def get_movie_byid(movieid):
         if str(movie["id"]) == str(movieid):
             res = make_response(jsonify(movie),200)
             return res
-    return make_response(jsonify({"error":"Movie ID not found"}),500)
+    return make_response(jsonify({"error":"Movie ID not found"}),404)
 
 # Post a new movie
 @app.route("/movies/<movieid>", methods=['POST'])
+@jwt_required()
 def add_movie(movieid):
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     req = request.get_json()
 
     for movie in movies:
         if str(movie["id"]) == str(movieid):
             print(movie["id"])
             print(movieid)
-            return make_response(jsonify({"error":"movie ID already exists"}),500)
+            return make_response(jsonify({"error":"movie ID already exists"}),409)
 
     movies.append(req)
     write(movies)
-    res = make_response(jsonify({"message":"movie added"}),200)
+    res = make_response(jsonify({"message":"movie added"}),201)
     return res
 
 # Delete a movie
 @app.route("/movies/<movieid>", methods=['DELETE'])
+@jwt_required()
 def del_movie(movieid):
+    is_admin = get_jwt().get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     for movie in movies:
         if str(movie["id"]) == str(movieid):
             movies.remove(movie)
             write(movies)
             return make_response(jsonify(movie),200)
 
-    res = make_response(jsonify({"error":"movie ID not found"}),500)
+    res = make_response(jsonify({"error":"movie ID not found"}),404)
     return res
 
 if __name__ == "__main__":
