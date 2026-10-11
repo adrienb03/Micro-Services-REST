@@ -1,0 +1,395 @@
+
+openapi: 3.0.3
+
+info:
+  title: Schedule Service API
+  description: API for managing movie schedules and showtimes.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:3202
+    description: Local development server
+
+tags:
+  - name: admin
+    description: Secured Admin-only calls
+  - name: dev
+    description: Public operations available without authentication
+
+paths:
+  /json:
+    get:
+      tags:
+        - dev
+      summary: Retrieve the full schedule
+      description: Returns all scheduled dates and their associated movie IDs.
+      responses:
+        "200":
+          description: Full schedule retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Schedule"
+              example:
+                - date: "20151130"
+                  movies:
+                    - "720d006c-3a57-4b6a-b18f-9b713b073f3c"
+                    - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+                    - "39ab85e5-5e8e-4dc5-afea-65dc368bd7ab"
+                - date: "20151201"
+                  movies:
+                    - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                    - "7daf7208-be4d-4944-a3ae-c1c2f516f3e6"
+                    - "39ab85e5-5e8e-4dc5-afea-65dc368bd7ab"
+                    - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+                - date: "20151202"
+                  movies:
+                    - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+                    - "96798c08-d19b-4986-a05d-7da856efb697"
+                    - "39ab85e5-5e8e-4dc5-afea-65dc368bd7ab"
+                    - "276c79ec-a26a-40a6-b3d3-fb242a5947b6"
+                - date: "20151203"
+                  movies:
+                    - "720d006c-3a57-4b6a-b18f-9b713b073f3c"
+                    - "39ab85e5-5e8e-4dc5-afea-65dc368bd7ab"
+                - date: "20151204"
+                  movies:
+                    - "96798c08-d19b-4986-a05d-7da856efb697"
+                    - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+                    - "7daf7208-be4d-4944-a3ae-c1c2f516f3e6"
+                - date: "20151205"
+                  movies:
+                    - "96798c08-d19b-4986-a05d-7da856efb697"
+                    - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+                    - "7daf7208-be4d-4944-a3ae-c1c2f516f3e6"
+                    - "276c79ec-a26a-40a6-b3d3-fb242a5947b6"
+                    - "39ab85e5-5e8e-4dc5-afea-65dc368bd7ab"
+
+  /schedule/{date}:
+    get:
+      tags:
+        - dev
+      summary: Retrieve the schedule for a specific date
+      description: Returns the movie IDs scheduled on the specified date.
+      parameters:
+        - $ref: "#/components/parameters/Date"
+      responses:
+        "200":
+          description: Schedule found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+              example:
+                date: "20151201"
+                movies:
+                  - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                  - "7daf7208-be4d-4944-a3ae-c1c2f516f3e6"
+                  - "39ab85e5-5e8e-4dc5-afea-65dc368bd7ab"
+                  - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+        "404":
+          description: No schedule found for the specified date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Aucune programmation à cette date"
+
+    post:
+      tags:
+        - admin
+      summary: Add a new schedule
+      description: >
+        Adds a new date with its associated movie IDs.
+        All referenced movies must exist in the Movie service data.
+        Requires administrator privileges.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Date"
+      requestBody:
+        required: true
+        description: Date and list of movie IDs to schedule.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Schedule"
+            example:
+              date: "20151230"
+              movies:
+                - "720d006c-3a57-4b6a-b18f-9b713b073f3c"
+      responses:
+        "201":
+          description: Schedule added successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                message: "date ajoutée"
+        "400":
+          description: One or more referenced movies do not exist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Movie invalid-movie-id not found"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A schedule already exists for this date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "cette date existe déjà"
+
+    delete:
+      tags:
+        - admin
+      summary: Delete a schedule
+      description: Deletes the schedule associated with a specific date.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Date"
+      responses:
+        "200":
+          description: Schedule deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                message: "date supprimée"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "cette date n'existe pas"
+
+  /moviedates/{movieid}:
+    get:
+      tags:
+        - dev
+      summary: Retrieve all scheduled dates for a movie
+      description: Returns the dates on which the specified movie is scheduled.
+      parameters:
+        - $ref: "#/components/parameters/MovieId"
+      responses:
+        "200":
+          description: List of dates on which the movie is scheduled
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  description: Date in YYYYMMDD format
+                  pattern: '^\d{8}$'
+              example:
+                - "20151130"
+                - "20151201"
+                - "20151202"
+                - "20151204"
+                - "20151205"
+        "404":
+          description: Movie is not scheduled on any date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Ce film ne passe à aucune date"
+
+  /schedule/{date}/details:
+    get:
+      tags:
+        - dev
+      summary: Retrieve scheduled movies with their details
+      description: >
+        Returns the schedule for a specific date,
+        replacing movie IDs with complete movie objects.
+      parameters:
+        - $ref: "#/components/parameters/Date"
+      responses:
+        "200":
+          description: Detailed schedule retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleDetails"
+              example:
+                date: "20151201"
+                movies:
+                  - id: "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                    title: "Example Movie"
+                    rating: 7.4
+                    director: "Example Director"
+        "404":
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Schedule not found"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT provided in the Authorization header.
+        Administrator privileges are required for protected operations.
+
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token_cookie
+      description: >
+        JWT provided in the access_token_cookie.
+        State-changing requests authenticated via cookies
+        also require a valid CSRF token by default.
+
+  parameters:
+    Date:
+      name: date
+      in: path
+      required: true
+      description: Date of the schedule in YYYYMMDD format.
+      schema:
+        type: string
+        pattern: '^\d{8}$'
+        example: "20151201"
+
+    MovieId:
+      name: movieid
+      in: path
+      required: true
+      description: Unique identifier of the movie.
+      schema:
+        type: string
+        format: uuid
+        example: "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+
+  schemas:
+    Schedule:
+      type: object
+      description: Represents a scheduled date and its associated movies.
+      properties:
+        date:
+          type: string
+          description: Date in YYYYMMDD format.
+          pattern: '^\d{8}$'
+          example: "20151201"
+        movies:
+          type: array
+          description: List of movie identifiers scheduled for this date.
+          items:
+            type: string
+            format: uuid
+          example:
+            - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+            - "7daf7208-be4d-4944-a3ae-c1c2f516f3e6"
+            - "39ab85e5-5e8e-4dc5-afea-65dc368bd7ab"
+            - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+      required:
+        - date
+        - movies
+
+    Movie:
+      type: object
+      description: Representation of a movie.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the movie.
+          example: "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+        title:
+          type: string
+          description: Movie title.
+          example: "Example Movie"
+        rating:
+          type: number
+          format: float
+          description: Movie rating.
+          example: 7.4
+        director:
+          type: string
+          description: Movie director.
+          example: "Example Director"
+      required:
+        - id
+        - title
+
+    ScheduleDetails:
+      type: object
+      description: Schedule with full movie information instead of movie IDs.
+      properties:
+        date:
+          type: string
+          description: Date in YYYYMMDD format.
+          example: "20151201"
+        movies:
+          type: array
+          description: Full details of the scheduled movies.
+          items:
+            $ref: "#/components/schemas/Movie"
+      required:
+        - date
+        - movies
+
+    Message:
+      type: object
+      description: Successful operation response.
+      properties:
+        message:
+          type: string
+          description: Confirmation message.
+          example: "date ajoutée"
+      required:
+        - message
+
+    Error:
+      type: object
+      description: Error response.
+      properties:
+        error:
+          type: string
+          description: Explanation of the error.
+          example: "Schedule not found"
+      required:
+        - error
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT.
+
+    Forbidden:
+      description: Administrator privileges required.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Forbidden"

@@ -1,0 +1,526 @@
+
+openapi: 3.0.3
+
+info:
+  title: Booking Service API
+  description: API for managing movie bookings and retrieving booking details.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:3201
+    description: Local development server
+
+tags:
+  - name: admin
+    description: Secured Admin-only calls
+  - name: user
+    description: Secured operations available to the booking owner or an administrator
+
+paths:
+  /bookings/json:
+    get:
+      tags:
+        - admin
+      summary: Retrieve all bookings
+      description: Returns the complete list of bookings. Requires administrator privileges.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        "200":
+          description: List of bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+              example:
+                - userid: "chris_rivers"
+                  dates:
+                    - date: "20151201"
+                      movies:
+                        - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                - userid: "garret_heaton"
+                  dates:
+                    - date: "20151201"
+                      movies:
+                        - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                    - date: "20151202"
+                      movies:
+                        - "276c79ec-a26a-40a6-b3d3-fb242a5947b6"
+                - userid: "dwight_schrute"
+                  dates:
+                    - date: "20151201"
+                      movies:
+                        - "7daf7208-be4d-4944-a3ae-c1c2f516f3e6"
+                        - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                    - date: "20151205"
+                      movies:
+                        - "a8034f44-aee4-44cf-b32c-74cf452aaaae"
+                        - "276c79ec-a26a-40a6-b3d3-fb242a5947b6"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /bookings/{userid}:
+    get:
+      tags:
+        - user
+      summary: Retrieve a user's bookings
+      description: >
+        Returns the bookings of the specified user.
+        Accessible only to the booking owner or an administrator.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Booking found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+              example:
+                userid: "garret_heaton"
+                dates:
+                  - date: "20151201"
+                    movies:
+                      - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                  - date: "20151202"
+                    movies:
+                      - "276c79ec-a26a-40a6-b3d3-fb242a5947b6"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Booking ID not found"
+
+    post:
+      tags:
+        - user
+      summary: Create a booking for a user
+      description: >
+        Creates bookings for the specified user.
+        The user must exist and must not already have bookings.
+        Each movie must be scheduled on its requested date.
+        Accessible only to the user themselves or an administrator.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        description: Dates and movie IDs to book.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequest"
+            example:
+              dates:
+                - date: "20151203"
+                  movies:
+                    - "720d006c-3a57-4b6a-b18f-9b713b073f3c"
+                - date: "20151204"
+                  movies:
+                    - "96798c08-d19b-4986-a05d-7da856efb697"
+      responses:
+        "201":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                message: "Booking created"
+        "400":
+          description: A movie is not scheduled on the requested date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Movie 720d006c-3a57-4b6a-b18f-9b713b073f3c is not scheduled on 20151204"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "User not found"
+        "409":
+          description: User already has bookings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "User already has bookings"
+
+    delete:
+      tags:
+        - user
+      summary: Delete a user's bookings
+      description: >
+        Deletes all bookings associated with the specified user.
+        Accessible only to the booking owner or an administrator.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Bookings deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+              example:
+                userid: "chris_rivers"
+                dates:
+                  - date: "20151201"
+                    movies:
+                      - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "booking ID not found"
+
+  /bookings/{userid}/details:
+    get:
+      tags:
+        - user
+      summary: Retrieve bookings with movie details
+      description: >
+        Returns the bookings of a user, replacing movie IDs
+        with complete movie objects from the Movie service.
+        Accessible only to the booking owner or an administrator.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Detailed bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingDetails"
+              example:
+                userid: "garret_heaton"
+                dates:
+                  - date: "20151201"
+                    movies:
+                      - id: "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                        title: "Creed"
+                        rating: 8.8
+                        director: "Ryan Coogler"
+                  - date: "20151202"
+                    movies:
+                      - id: "276c79ec-a26a-40a6-b3d3-fb242a5947b6"
+                        title: "The Danish Girl"
+                        rating: 5.3
+                        director: "Tom Hooper"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "User booking not found"
+
+  /bookings/{userid}/userdetail:
+    get:
+      tags:
+        - user
+      summary: Retrieve bookings with user information
+      description: >
+        Returns the user information together with their booking dates
+        and movie IDs. Accessible only to the booking owner
+        or an administrator.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Booking with user details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingUserDetails"
+              example:
+                user:
+                  id: "garret_heaton"
+                  name: "Garret Heaton"
+                  last_active: 1360031425
+                dates:
+                  - date: "20151201"
+                    movies:
+                      - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+                  - date: "20151202"
+                    movies:
+                      - "276c79ec-a26a-40a6-b3d3-fb242a5947b6"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Booking not found"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT provided in the Authorization header.
+        Access is restricted to the booking owner or an administrator.
+
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token_cookie
+      description: >
+        JWT provided in the access_token_cookie.
+        State-changing requests authenticated via cookies
+        also require a valid CSRF token by default.
+
+  parameters:
+    UserId:
+      name: userid
+      in: path
+      required: true
+      description: Unique identifier of the user.
+      schema:
+        type: string
+        example: "garret_heaton"
+
+  schemas:
+    BookingDate:
+      type: object
+      description: Represents a booking date and its associated movie IDs.
+      properties:
+        date:
+          type: string
+          description: Date in YYYYMMDD format.
+          pattern: '^\d{8}$'
+          example: "20151201"
+        movies:
+          type: array
+          description: List of booked movie identifiers.
+          items:
+            type: string
+          example:
+            - "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+      required:
+        - date
+        - movies
+
+    Booking:
+      type: object
+      description: Represents all bookings associated with a user.
+      properties:
+        userid:
+          type: string
+          description: Unique identifier of the user.
+          example: "garret_heaton"
+        dates:
+          type: array
+          description: List of dates and movies booked by the user.
+          items:
+            $ref: "#/components/schemas/BookingDate"
+      required:
+        - userid
+        - dates
+
+    BookingRequest:
+      type: object
+      description: Data required to create bookings for a user.
+      properties:
+        dates:
+          type: array
+          description: List of dates and movie IDs to book.
+          items:
+            $ref: "#/components/schemas/BookingDate"
+      required:
+        - dates
+
+    Movie:
+      type: object
+      description: Representation of a movie.
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the movie.
+          example: "267eedb8-0f5d-42d5-8f43-72426b9fb3e6"
+        title:
+          type: string
+          description: Movie title.
+          example: "Creed"
+        rating:
+          type: number
+          format: float
+          description: Rating assigned to the movie.
+          example: 8.8
+        director:
+          type: string
+          description: Movie director.
+          example: "Ryan Coogler"
+      required:
+        - id
+        - title
+        - rating
+        - director
+
+    BookingDateDetails:
+      type: object
+      description: Booking date containing complete movie objects.
+      properties:
+        date:
+          type: string
+          description: Date in YYYYMMDD format.
+          pattern: '^\d{8}$'
+          example: "20151201"
+        movies:
+          type: array
+          description: Full details of the booked movies.
+          items:
+            $ref: "#/components/schemas/Movie"
+      required:
+        - date
+        - movies
+
+    BookingDetails:
+      type: object
+      description: User bookings with full movie information.
+      properties:
+        userid:
+          type: string
+          description: Unique identifier of the user.
+          example: "garret_heaton"
+        dates:
+          type: array
+          description: Booking dates containing full movie objects.
+          items:
+            $ref: "#/components/schemas/BookingDateDetails"
+      required:
+        - userid
+        - dates
+
+    User:
+      type: object
+      description: Representation of a user.
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the user.
+          example: "garret_heaton"
+        name:
+          type: string
+          description: Full name of the user.
+          example: "Garret Heaton"
+        last_active:
+          type: integer
+          format: int64
+          description: Last activity timestamp in Unix seconds.
+          example: 1360031425
+        admin:
+          type: boolean
+          description: >
+            Indicates whether the user has administrator privileges.
+            Optional field; treated as false when absent.
+          example: false
+      required:
+        - id
+        - name
+        - last_active
+
+    BookingUserDetails:
+      type: object
+      description: User information together with their booking dates.
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        dates:
+          type: array
+          description: Booking dates and their associated movie IDs.
+          items:
+            $ref: "#/components/schemas/BookingDate"
+      required:
+        - user
+        - dates
+
+    Message:
+      type: object
+      description: Successful operation response.
+      properties:
+        message:
+          type: string
+          description: Confirmation message.
+          example: "Booking created"
+      required:
+        - message
+
+    Error:
+      type: object
+      description: Error response.
+      properties:
+        error:
+          type: string
+          description: Explanation of the error.
+          example: "Booking not found"
+      required:
+        - error
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT.
+
+    Forbidden:
+      description: User is not authorized to perform this operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Forbidden"

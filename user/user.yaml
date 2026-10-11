@@ -1,0 +1,359 @@
+
+openapi: 3.0.3
+
+info:
+  title: User Service API
+  description: API for user authentication and user management using JWT.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:3203
+    description: Local development server
+
+tags:
+  - name: auth
+    description: User authentication operations
+  - name: admin
+    description: Secured Admin-only calls
+  - name: user
+    description: Secured operations available to the user or an administrator
+
+paths:
+  /login:
+    post:
+      tags:
+        - auth
+      summary: Authenticate a user
+      description: >
+        Authenticates a user using their username, which corresponds
+        to their user ID. If the user exists, generates a JWT containing
+        their identity and admin role. The token is returned in the
+        JSON response and stored in an HTTP cookie.
+        No password verification is performed.
+      requestBody:
+        required: true
+        description: Username of the user requesting authentication.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: "chris_rivers"
+      responses:
+        "200":
+          description: Authentication successful
+          headers:
+            Set-Cookie:
+              description: >
+                Sets the access_token_cookie containing the JWT.
+                A CSRF cookie is also set by default.
+              schema:
+                type: string
+              example: "access_token_cookie=<JWT>; HttpOnly; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+              example:
+                access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjaHJpc19yaXZlcnMifQ.signature"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "User not found"
+
+  /user/{userid}:
+    get:
+      tags:
+        - user
+      summary: Retrieve a user by ID
+      description: >
+        Returns information about the specified user.
+        Accessible only to the user themselves or an administrator.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              example:
+                id: "chris_rivers"
+                name: "Chris Rivers"
+                last_active: 1360031010
+                admin: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "User not found"
+
+  /users/json:
+    get:
+      tags:
+        - admin
+      summary: Retrieve all users
+      description: Returns the complete list of users. Requires administrator privileges.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        "200":
+          description: List of users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+              example:
+                - id: "chris_rivers"
+                  name: "Chris Rivers"
+                  last_active: 1360031010
+                  admin: true
+                - id: "peter_curley"
+                  name: "Peter Curley"
+                  last_active: 1360031222
+                - id: "garret_heaton"
+                  name: "Garret Heaton"
+                  last_active: 1360031425
+                - id: "michael_scott"
+                  name: "Michael Scott"
+                  last_active: 1360031625
+                - id: "jim_halpert"
+                  name: "Jim Halpert"
+                  last_active: 1360031325
+                - id: "pam_beesly"
+                  name: "Pam Beesly"
+                  last_active: 1360031225
+                - id: "dwight_schrute"
+                  name: "Dwight Schrute"
+                  last_active: 1360031202
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /users/{userid}:
+    post:
+      tags:
+        - admin
+      summary: Add a new user
+      description: >
+        Creates a new user with the specified ID.
+        The user ID in the JSON body must match the ID in the URL.
+        The ID must not already exist.
+        Requires administrator privileges.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        description: Information about the new user.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+            example:
+              id: "new_user"
+              name: "New User"
+              last_active: 1360031800
+              admin: false
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                message: "user added"
+        "400":
+          description: Invalid user data or ID mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Invalid user data"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: User ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "user ID already exists"
+
+    delete:
+      tags:
+        - admin
+      summary: Delete a user
+      description: >
+        Deletes the user with the specified ID.
+        Requires administrator privileges.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              example:
+                id: "peter_curley"
+                name: "Peter Curley"
+                last_active: 1360031222
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User ID not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "user ID not found"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT provided in the Authorization header.
+        The token contains the user identity and an admin claim.
+
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token_cookie
+      description: >
+        JWT stored in an HTTP cookie.
+        State-changing requests authenticated through cookies
+        also require a valid CSRF token by default.
+
+  parameters:
+    UserId:
+      name: userid
+      in: path
+      required: true
+      description: Unique identifier of the user.
+      schema:
+        type: string
+        example: "chris_rivers"
+
+  schemas:
+    LoginRequest:
+      type: object
+      description: Data required to request a JWT.
+      properties:
+        username:
+          type: string
+          description: Username corresponding to an existing user ID.
+          example: "chris_rivers"
+      required:
+        - username
+
+    LoginResponse:
+      type: object
+      description: Successful authentication response.
+      properties:
+        access_token:
+          type: string
+          description: JWT access token generated for the authenticated user.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjaHJpc19yaXZlcnMifQ.signature"
+      required:
+        - access_token
+
+    User:
+      type: object
+      description: Representation of a user.
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the user.
+          example: "chris_rivers"
+        name:
+          type: string
+          description: Full name of the user.
+          example: "Chris Rivers"
+        last_active:
+          type: integer
+          format: int64
+          description: Last activity timestamp in Unix seconds.
+          example: 1360031010
+        admin:
+          type: boolean
+          description: >
+            Indicates whether the user has administrator privileges.
+            Optional field; treated as false during authentication
+            when absent.
+          example: true
+      required:
+        - id
+        - name
+        - last_active
+
+    Message:
+      type: object
+      description: Successful operation response.
+      properties:
+        message:
+          type: string
+          description: Confirmation message.
+          example: "user added"
+      required:
+        - message
+
+    Error:
+      type: object
+      description: Error response.
+      properties:
+        error:
+          type: string
+          description: Explanation of the error.
+          example: "User not found"
+      required:
+        - error
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT.
+
+    Forbidden:
+      description: User is not authorized to perform this operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Forbidden"
