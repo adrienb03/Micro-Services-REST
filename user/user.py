@@ -3,7 +3,7 @@ import requests
 import json
 from werkzeug.exceptions import NotFound
 
-from flask_jwt_extended import create_access_token, get_jwt_identity, JWTManager, jwt_required
+from flask_jwt_extended import create_access_token, get_jwt_identity, JWTManager, jwt_required, set_access_cookies, get_jwt
 
 app = Flask(__name__)
 
@@ -35,18 +35,18 @@ def login():
     # 1. Recuperer dans la requête le nom de l'utilisateur qui souhaite se connecter
     username = request.get_json().get("username")
     # 2. Valider que l'utilisateur existe bien
-    user = None
-    for u in users:
-        if u["name"] == username:
-            user = u
-            break
+    user = next((u for u in users if u["id"] == username), None)
     if user is None:
         return make_response(jsonify({"error": "User not found"}), 404)
+    # Add admin role to JWT
+    additional_claims = {
+        "admin": user.get("admin", False)
+    }
     # 3. Création d'un token d'accès JWT
-    access_token = create_access_token(identity=user["id"])
+    access_token = create_access_token(identity=user["id"], additional_claims=additional_claims)
     # renvoyer le token JWT à la fois dans la réponse et dans un cookie
     response = make_response(jsonify({"access_token": access_token}), 200)
-    response.set_cookie("access_token", access_token)
+    set_access_cookies(response, access_token)
     # 4. Renvoi du token créé
     return response
 
@@ -55,19 +55,19 @@ def login():
 def infos(username):
     # 1. Récuperer l'identité jwt
     current_user_id = get_jwt_identity()
-    # 2. Vérifier si le username de l'utilisateur demandé correspond bien à celui du jwt
-    user = None
-    for u in users:
-        if u["id"] == current_user_id and u["name"] == username:
-            user = u
-            break
+    # Récupérer les claims du token
+    claims = get_jwt()
+    is_admin = claims.get("admin", False)
+    # Find requested user
+    user = next((u for u in users if u["id"] == username), None)
     if user is None:
-        return make_response(jsonify({"error": "User not found or unauthorized"}), 404)
-    # 3. Récupérer les infos de l'utilisateur
-    user_info = user
-    # 4. Renvoyer en JSON
-    return make_response(jsonify(user_info), 200)
+        return make_response(jsonify({"error": "User not found"}), 404)
+    # Check authorization
+    if user["id"] != current_user_id and not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    return make_response(jsonify(user), 200)
 
+# get all users
 @app.route("/users/json", methods=['GET'])
 def get_json():
     res = make_response(jsonify(users), 200)
@@ -80,8 +80,9 @@ def get_user_by_id(userid):
         if str(user["id"]) == str(userid):
             res = make_response(jsonify(user),200)
             return res
-    return make_response(jsonify({"error":"User ID not found"}),500)
+    return make_response(jsonify({"error":"User ID not found"}),404)
 
+# Post a new user
 @app.route("/users/<userid>", methods=['POST'])
 def add_user(userid):
     req = request.get_json()
@@ -95,6 +96,7 @@ def add_user(userid):
     res = make_response(jsonify({"message":"user added"}),200)
     return res
 
+# Delete a user
 @app.route("/users/<userid>", methods=['DELETE'])
 def del_user(userid):
     for user in users:
@@ -103,8 +105,9 @@ def del_user(userid):
             write(users)
             return make_response(jsonify(user),200)
 
-    res = make_response(jsonify({"error":"user ID not found"}),500)
+    res = make_response(jsonify({"error":"user ID not found"}),404)
     return res
+
 
 if __name__ == "__main__":
    print("Server running in port %s"%(PORT))
