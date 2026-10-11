@@ -30,6 +30,7 @@ def home():
    return "<h1 style='color:blue'>Welcome to the User service!</h1>"
 
 # Route d'authentification
+# username is the user id
 @app.route("/login", methods=["POST"])
 def login():
     # 1. Recuperer dans la requête le nom de l'utilisateur qui souhaite se connecter
@@ -50,16 +51,18 @@ def login():
     # 4. Renvoi du token créé
     return response
 
-@app.route("/user/<username>", methods=["GET"])
+# get user by id
+#only the user himself or an admin can access this endpoint
+@app.route("/user/<userid>", methods=["GET"])
 @jwt_required()
-def infos(username):
+def infos(userid):
     # 1. Récuperer l'identité jwt
     current_user_id = get_jwt_identity()
     # Récupérer les claims du token
     claims = get_jwt()
     is_admin = claims.get("admin", False)
     # Find requested user
-    user = next((u for u in users if u["id"] == username), None)
+    user = next((u for u in users if u["id"] == userid), None)
     if user is None:
         return make_response(jsonify({"error": "User not found"}), 404)
     # Check authorization
@@ -68,37 +71,51 @@ def infos(username):
     return make_response(jsonify(user), 200)
 
 # get all users
+# only an admin can access this endpoint
 @app.route("/users/json", methods=['GET'])
+@jwt_required()
 def get_json():
+    claims = get_jwt()
+    is_admin = claims.get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
     res = make_response(jsonify(users), 200)
     return res
 
-# get user by id
-@app.route("/users/<userid>", methods=['GET'])
-def get_user_by_id(userid):
-    for user in users:
-        if str(user["id"]) == str(userid):
-            res = make_response(jsonify(user),200)
-            return res
-    return make_response(jsonify({"error":"User ID not found"}),404)
-
 # Post a new user
+# only an admin can post a new user
 @app.route("/users/<userid>", methods=['POST'])
+@jwt_required()
 def add_user(userid):
+    claims = get_jwt()
+    is_admin = claims.get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     req = request.get_json()
 
+    if not req or req.get("id") != userid:
+        return make_response(jsonify({"error": "Invalid user data"}), 400)
+
     for user in users:
         if str(user["id"]) == str(userid):
-            return make_response(jsonify({"error":"user ID already exists"}),500)
+            return make_response(jsonify({"error":"user ID already exists"}),409)
 
     users.append(req)
     write(users)
-    res = make_response(jsonify({"message":"user added"}),200)
+    res = make_response(jsonify({"message":"user added"}),201)
     return res
 
 # Delete a user
+# only an admin can delete a user
 @app.route("/users/<userid>", methods=['DELETE'])
+@jwt_required()
 def del_user(userid):
+    claims = get_jwt()
+    is_admin = claims.get("admin", False)
+    if not is_admin:
+        return make_response(jsonify({"error": "Forbidden"}), 403)
+    
     for user in users:
         if str(user["id"]) == str(userid):
             users.remove(user)
