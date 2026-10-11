@@ -25,6 +25,11 @@ def write(users):
         full['users']=users
         json.dump(full, f)
 
+# returns True if the current user is an admin, False otherwise
+def is_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)
+
 @app.route("/", methods=['GET'])
 def home():
    return "<h1 style='color:blue'>Welcome to the User service!</h1>"
@@ -58,15 +63,12 @@ def login():
 def infos(userid):
     # 1. Récuperer l'identité jwt
     current_user_id = get_jwt_identity()
-    # Récupérer les claims du token
-    claims = get_jwt()
-    is_admin = claims.get("admin", False)
     # Find requested user
     user = next((u for u in users if u["id"] == userid), None)
     if user is None:
         return make_response(jsonify({"error": "User not found"}), 404)
     # Check authorization
-    if user["id"] != current_user_id and not is_admin:
+    if user["id"] != current_user_id and not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     return make_response(jsonify(user), 200)
 
@@ -75,9 +77,7 @@ def infos(userid):
 @app.route("/users/json", methods=['GET'])
 @jwt_required()
 def get_json():
-    claims = get_jwt()
-    is_admin = claims.get("admin", False)
-    if not is_admin:
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     res = make_response(jsonify(users), 200)
     return res
@@ -87,9 +87,8 @@ def get_json():
 @app.route("/users/<userid>", methods=['POST'])
 @jwt_required()
 def add_user(userid):
-    claims = get_jwt()
-    is_admin = claims.get("admin", False)
-    if not is_admin:
+
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     req = request.get_json()
@@ -111,9 +110,8 @@ def add_user(userid):
 @app.route("/users/<userid>", methods=['DELETE'])
 @jwt_required()
 def del_user(userid):
-    claims = get_jwt()
-    is_admin = claims.get("admin", False)
-    if not is_admin:
+
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     for user in users:

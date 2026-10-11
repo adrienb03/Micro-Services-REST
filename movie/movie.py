@@ -25,6 +25,11 @@ def write(movies):
         full['movies']=movies
         json.dump(full, f)
 
+# returns True if the current user is an admin, False otherwise
+def is_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)   
+
 # root message
 @app.route("/", methods=['GET'])
 def home():
@@ -49,8 +54,8 @@ def get_movie_byid(movieid):
 @app.route("/movies/<movieid>", methods=['POST'])
 @jwt_required()
 def add_movie(movieid):
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin:
+
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     req = request.get_json()
@@ -70,8 +75,8 @@ def add_movie(movieid):
 @app.route("/movies/<movieid>", methods=['DELETE'])
 @jwt_required()
 def del_movie(movieid):
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin:
+
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     for movie in movies:

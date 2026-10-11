@@ -27,6 +27,11 @@ def write(schedule):
         full['schedule'] = schedule
         json.dump(full, f)
 
+# returns True if the current user is an admin, False otherwise
+def is_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)
+
 @app.route("/", methods=['GET'])
 def home():
    return "<h1 style='color:blue'>Welcome to the Showtime service!</h1>"
@@ -66,8 +71,8 @@ def date_selon_film(movieid):
 @app.route("/schedule/<date>", methods=['POST'])
 @jwt_required()
 def ajout_date(date):
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin:
+    
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     req = request.get_json()
@@ -95,8 +100,8 @@ def ajout_date(date):
 @app.route("/schedule/<date>", methods=['DELETE'])
 @jwt_required()
 def suppression_date(date):
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin:
+
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     for s in schedule:
