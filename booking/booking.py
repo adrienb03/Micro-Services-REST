@@ -34,6 +34,16 @@ def write(bookings):
         full['bookings']=bookings
         json.dump(full, f)
 
+# returns True if the current user is an admin, False otherwise
+def is_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)
+
+# returns True if the current user can access the specified user's data, False otherwise
+def can_access_user(userid):
+    current_user_id = get_jwt_identity()
+    return current_user_id == userid or is_admin()
+
 @app.route("/", methods=['GET'])
 def home():
    return "<h1 style='color:blue'>Welcome to the Booking service!</h1>"
@@ -41,8 +51,7 @@ def home():
 @app.route("/bookings/json", methods=['GET'])
 @jwt_required()
 def get_bookings():
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin:
+    if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     res = make_response(jsonify(bookings), 200)
@@ -52,11 +61,9 @@ def get_bookings():
 @app.route("/bookings/<userid>", methods=['GET'])
 @jwt_required()
 def get_booking_by_id(userid):
-    current_user_id = get_jwt_identity()
-    is_admin = get_jwt().get("admin", False)
 
     # Check authorization
-    if current_user_id != userid and not is_admin:
+    if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     for booking in bookings:
@@ -69,9 +76,8 @@ def get_booking_by_id(userid):
 @app.route("/bookings/<userid>", methods=["POST"])
 @jwt_required()
 def add_booking(userid):
-    current_user_id = get_jwt_identity()
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin and current_user_id != userid:
+
+    if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403)
 
     req = request.get_json()
@@ -110,9 +116,8 @@ def add_booking(userid):
 @app.route("/bookings/<userid>", methods=['DELETE'])
 @jwt_required()
 def del_booking(userid):
-    current_user_id = get_jwt_identity()
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin and current_user_id != userid:
+
+    if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     for booking in bookings:
@@ -129,9 +134,8 @@ def del_booking(userid):
 @app.route("/bookings/<userid>/details", methods=['GET'])
 @jwt_required()
 def get_schedules_by_userid(userid):
-   current_user_id = get_jwt_identity()
-   is_admin = get_jwt().get("admin", False)
-   if not is_admin and current_user_id != userid:
+
+   if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403) 
              
    for booking in bookings:
@@ -160,9 +164,8 @@ def get_schedules_by_userid(userid):
 @app.route("/bookings/<userid>/userdetail", methods=["GET"])
 @jwt_required()
 def get_booking_with_user(userid):
-    current_user_id = get_jwt_identity()
-    is_admin = get_jwt().get("admin", False)
-    if not is_admin and current_user_id != userid:
+    
+    if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
     for booking in bookings:
