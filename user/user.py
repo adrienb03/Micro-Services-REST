@@ -9,6 +9,8 @@ app = Flask(__name__)
 
 # Initialisation de la partie JWT
 app.config["JWT_SECRET_KEY"] = "super-secret"
+app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
+app.config["JWT_COOKIE_SECURE"] = False
 jwt = JWTManager(app)
 
 PORT = 3203
@@ -42,8 +44,11 @@ def login():
         return make_response(jsonify({"error": "User not found"}), 404)
     # 3. Création d'un token d'accès JWT
     access_token = create_access_token(identity=user["id"])
+    # renvoyer le token JWT à la fois dans la réponse et dans un cookie
+    response = make_response(jsonify({"access_token": access_token}), 200)
+    response.set_cookie("access_token", access_token)
     # 4. Renvoi du token créé
-    return make_response(jsonify({"access_token": access_token}), 200)
+    return response
 
 @app.route("/user/<username>", methods=["GET"])
 @jwt_required()
