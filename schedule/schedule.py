@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, make_response
 import json
+import requests
 from werkzeug.exceptions import NotFound
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
@@ -18,9 +19,12 @@ HOST = '0.0.0.0'
 with open('{}/databases/times.json'.format("."), "r") as jsf:
    schedule = json.load(jsf)["schedule"]
 
-with open('{}./movie/databases/movies.json'.format("."), "r") as jsf:
-   movies = json.load(jsf)["movies"]
-
+def fetch_movies():
+    movies_response = requests.get("http://movie:3200/json", timeout=5)
+    movies_response.raise_for_status()
+    movies = movies_response.json()
+    return movies
+   
 def write(schedule):
     with open('{}/databases/times.json'.format("."), 'w') as f:
         full = {}
@@ -81,6 +85,7 @@ def ajout_date(date):
         if str(s["date"]) == str(date):
             return make_response(jsonify({"error": "cette date existe déjà"}), 409)
 
+    movies = fetch_movies()
     # Check if all movie IDs exist in movies.json
     for movie_id in req["movies"]:
         if not any(movie["id"] == movie_id for movie in movies):
@@ -116,12 +121,14 @@ def suppression_date(date):
 # Get scheduled movies for a date with their details
 @app.route("/schedule/<date>/details", methods=["GET"])
 def get_schedule_details(date):
+
     for s in schedule:
         if s["date"] == date:
             result = {
                 "date": s["date"],
                 "movies": []
             }
+            movies = fetch_movies()
             for movie_id in s["movies"]:
                 for movie in movies:
                     if movie["id"] == movie_id:

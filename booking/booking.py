@@ -19,14 +19,30 @@ HOST = '0.0.0.0'
 with open('{}/databases/bookings.json'.format("."), "r") as jsf:
    bookings = json.load(jsf)["bookings"]
 
-with open('{}./user/databases/users.json'.format("."), "r") as jsf:
-   users = json.load(jsf)["users"]
+def fetch_user(userid):
+    response = requests.get(
+        f"http://user:3203/user/{userid}",
+        headers={
+            "Authorization": request.headers.get("Authorization", "")
+        },
+        timeout=5
+    )
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    return response.json()
 
-with open('{}./movie/databases/movies.json'.format("."), "r") as jsf:
-   movies = json.load(jsf)["movies"]
+def fetch_movies():
+    movies_response = requests.get("http://movie:3200/json", timeout=5)
+    movies_response.raise_for_status()
+    movies = movies_response.json()
+    return movies
 
-with open('{}./schedule/databases/times.json'.format("."), "r") as jsf:
-   schedule = json.load(jsf)["schedule"]
+def fetch_schedule():
+    schedule_response = requests.get("http://schedule:3202/json", timeout=5)
+    schedule_response.raise_for_status()
+    schedule = schedule_response.json()
+    return schedule
 
 def write(bookings):
     with open('{}/databases/bookings.json'.format("."), 'w') as f:
@@ -83,15 +99,12 @@ def add_booking(userid):
     req = request.get_json()
     dates = req["dates"]
 
-    # Check if user exists
-    if not any(user["id"] == userid for user in users):
-        return make_response(jsonify({"error": "User not found"}), 404)
-
     # Check if user already has bookings
     if any(booking["userid"] == userid for booking in bookings):
         return make_response(jsonify({"error": "User already has bookings"}), 409)
 
     # Check if every movie is scheduled on the requested date
+    schedule = fetch_schedule()
     for entry in dates:
         date = entry["date"]
         for movie_id in entry["movies"]:
@@ -144,6 +157,7 @@ def get_schedules_by_userid(userid):
             "userid": booking["userid"],
             "dates": []
          }
+         movies = fetch_movies()
          for booking_date in booking["dates"]:
             date_result = {
                "date": booking_date["date"],
@@ -170,13 +184,14 @@ def get_booking_with_user(userid):
     
     for booking in bookings:
         if booking["userid"] == userid:
-            for user in users:
-                if user["id"] == userid:
-                    result = {
-                        "user": user,
-                        "dates": booking["dates"]
-                    }
-                    return make_response(jsonify(result), 200)
+            user = fetch_user(userid)
+            if user is None:
+                return make_response(jsonify({"error": "User not found"}), 404)
+            result = {
+                "user": user,
+                "dates": booking["dates"]
+            }
+            return make_response(jsonify(result), 200)
 
     return make_response(jsonify({"error": "Booking not found"}), 404)
 
