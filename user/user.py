@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, jsonify, make_response
-import requests
 import json
 from werkzeug.exceptions import NotFound
 
