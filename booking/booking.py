@@ -3,6 +3,9 @@ import requests
 import json
 from werkzeug.exceptions import NotFound
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, get_jwt
+from pymongo import MongoClient
+from bson.json_util import dumps
+import os
 
 app = Flask(__name__)
 
@@ -18,6 +21,13 @@ HOST = '0.0.0.0'
 
 with open('{}/databases/bookings.json'.format("."), "r") as jsf:
    bookings = json.load(jsf)["bookings"]
+
+client = MongoClient(os.environ["MONGO_URI"])
+db = client[os.environ["MONGO_DB"]]
+collection = db["bookings"]
+
+if collection.count_documents({}) == 0 and bookings:
+    collection.insert_many(bookings)
 
 def fetch_user(userid):
     response = requests.get(
@@ -44,12 +54,6 @@ def fetch_schedule():
     schedule = schedule_response.json()
     return schedule
 
-def write(bookings):
-    with open('{}/databases/bookings.json'.format("."), 'w') as f:
-        full = {}
-        full['bookings']=bookings
-        json.dump(full, f)
-
 # returns True if the current user is an admin, False otherwise
 def is_admin():
     claims = get_jwt()
@@ -70,8 +74,8 @@ def get_bookings():
     if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
-    res = make_response(jsonify(bookings), 200)
-    return res
+    bookings = list(collection.find({}, {"_id": 0}))
+    return make_response(jsonify(bookings), 200)
 
 # get booking by userid
 @app.route("/bookings/<userid>", methods=['GET'])
@@ -82,11 +86,10 @@ def get_booking_by_id(userid):
     if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
-    for booking in bookings:
-        if str(booking["userid"]) == str(userid):
-            res = make_response(jsonify(booking),200)
-            return res
-    return make_response(jsonify({"error":"Booking ID not found"}),404)
+    booking = collection.find_one({"userid": userid}, {"_id": 0})
+    if booking is None:
+        return make_response(jsonify({"error":"Booking ID not found"}),404)
+    return make_response(jsonify(booking), 200)
 
 # Post a new booking for a user
 @app.route("/bookings/<userid>", methods=["POST"])
@@ -100,7 +103,7 @@ def add_booking(userid):
     dates = req["dates"]
 
     # Check if user already has bookings
-    if any(booking["userid"] == userid for booking in bookings):
+    if collection.find_one({"userid": userid}):
         return make_response(jsonify({"error": "User already has bookings"}), 409)
 
     # Check if every movie is scheduled on the requested date
@@ -117,11 +120,10 @@ def add_booking(userid):
                     400
                 )
 
-    bookings.append({
+    collection.insert_one({
         "userid": userid,
         "dates": dates
     })
-    write(bookings)
 
     return make_response(jsonify({"message": "Booking created"}), 201)
 
@@ -133,67 +135,71 @@ def del_booking(userid):
     if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
-    for booking in bookings:
-        if str(booking["userid"]) == str(userid):
-            bookings.remove(booking)
-            write(bookings)
-            return make_response(jsonify(booking),200)
+    booking = collection.find_one_and_delete(
+        {"userid": userid},
+        {"_id": 0}
+    )
+    if booking is None:
+        return make_response(jsonify({"error": "booking ID not found"}), 404)
 
-    res = make_response(jsonify({"error":"booking ID not found"}),404)
-    return res
+    return make_response(jsonify(booking), 200)
 
 # Additional endpoint number 1/3
 # get bookings by user id and return the movies with their details
-@app.route("/bookings/<userid>/details", methods=['GET'])
+@app.route("/bookings/<userid>/details", methods=["GET"])
 @jwt_required()
 def get_schedules_by_userid(userid):
 
-   if not can_access_user(userid):
-        return make_response(jsonify({"error": "Forbidden"}), 403) 
-             
-   for booking in bookings:
-      if str(booking["userid"]) == str(userid):
-         result = {
-            "userid": booking["userid"],
-            "dates": []
-         }
-         movies = fetch_movies()
-         for booking_date in booking["dates"]:
-            date_result = {
-               "date": booking_date["date"],
-               "movies": []
-            }
-            for movie_id in booking_date["movies"]:
-               for movie in movies:
-                  if str(movie["id"]) == str(movie_id):
-                        date_result["movies"].append(movie)
-                        break
-            result["dates"].append(date_result)
-         return make_response(jsonify(result), 200)
+    if not can_access_user(userid):
+        return make_response(jsonify({"error": "Forbidden"}), 403)
 
-   return make_response(jsonify({"error": "User booking not found"}), 404)
+    booking = collection.find_one({"userid": userid}, {"_id": 0})
+    if booking is None:
+        return make_response(jsonify({"error": "User booking not found"}), 404)
+
+    result = {
+        "userid": booking["userid"],
+        "dates": []
+    }
+
+    movies = fetch_movies()
+    for booking_date in booking["dates"]:
+        date_result = {
+            "date": booking_date["date"],
+            "movies": []
+        }
+        for movie_id in booking_date["movies"]:
+            for movie in movies:
+                if str(movie["id"]) == str(movie_id):
+                    date_result["movies"].append(movie)
+                    break
+
+        result["dates"].append(date_result)
+
+    return make_response(jsonify(result), 200)
 
 # Additional endpoint number 2/3
 # Get booking with user details
 @app.route("/bookings/<userid>/userdetail", methods=["GET"])
 @jwt_required()
 def get_booking_with_user(userid):
-    
+
     if not can_access_user(userid):
         return make_response(jsonify({"error": "Forbidden"}), 403)
-    
-    for booking in bookings:
-        if booking["userid"] == userid:
-            user = fetch_user(userid)
-            if user is None:
-                return make_response(jsonify({"error": "User not found"}), 404)
-            result = {
-                "user": user,
-                "dates": booking["dates"]
-            }
-            return make_response(jsonify(result), 200)
 
-    return make_response(jsonify({"error": "Booking not found"}), 404)
+    booking = collection.find_one({"userid": userid}, {"_id": 0})
+    if booking is None:
+        return make_response(jsonify({"error": "Booking not found"}), 404)
+
+    user = fetch_user(userid)
+    if user is None:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+    result = {
+        "user": user,
+        "dates": booking["dates"]
+    }
+    return make_response(jsonify(result), 200)
 
 if __name__ == "__main__":
    print("Server running in port %s"%(PORT))

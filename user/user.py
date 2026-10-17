@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, jsonify, make_response
 import json
 from werkzeug.exceptions import NotFound
-
 from flask_jwt_extended import create_access_token, get_jwt_identity, JWTManager, jwt_required, set_access_cookies, get_jwt
+from pymongo import MongoClient
+from bson.json_util import dumps
+import os
 
 app = Flask(__name__)
 
@@ -18,11 +20,13 @@ HOST = '0.0.0.0'
 with open('{}/databases/users.json'.format("."), "r") as jsf:
    users = json.load(jsf)["users"]
 
-def write(users):
-    with open('{}/databases/users.json'.format("."), 'w') as f:
-        full = {}
-        full['users']=users
-        json.dump(full, f)
+client = MongoClient(os.environ["MONGO_URI"])
+db = client[os.environ["MONGO_DB"]]
+collection = db["users"]
+
+if collection.count_documents({}) == 0 and users:
+    collection.insert_many(users)
+
 
 # returns True if the current user is an admin, False otherwise
 def is_admin():
@@ -40,7 +44,7 @@ def login():
     # 1. Recuperer dans la requête le nom de l'utilisateur qui souhaite se connecter
     username = request.get_json().get("username")
     # 2. Valider que l'utilisateur existe bien
-    user = next((u for u in users if u["id"] == username), None)
+    user = collection.find_one({"id": username}, {"_id": 0})
     if user is None:
         return make_response(jsonify({"error": "User not found"}), 404)
     # Add admin role to JWT
@@ -63,7 +67,7 @@ def infos(userid):
     # 1. Récuperer l'identité jwt
     current_user_id = get_jwt_identity()
     # Find requested user
-    user = next((u for u in users if u["id"] == userid), None)
+    user = collection.find_one({"id": userid}, {"_id": 0})
     if user is None:
         return make_response(jsonify({"error": "User not found"}), 404)
     # Check authorization
@@ -78,8 +82,8 @@ def infos(userid):
 def get_json():
     if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
-    res = make_response(jsonify(users), 200)
-    return res
+    users = list(collection.find({}, {"_id": 0}))
+    return make_response(jsonify(users), 200)
 
 # Post a new user
 # only an admin can post a new user
@@ -95,14 +99,12 @@ def add_user(userid):
     if not req or req.get("id") != userid:
         return make_response(jsonify({"error": "Invalid user data"}), 400)
 
-    for user in users:
-        if str(user["id"]) == str(userid):
-            return make_response(jsonify({"error":"user ID already exists"}),409)
+    if collection.find_one({"id": userid}):
+        return make_response(jsonify({"error": "user ID already exists"}), 409)
 
-    users.append(req)
-    write(users)
-    res = make_response(jsonify({"message":"user added"}),201)
-    return res
+    collection.insert_one(req)
+
+    return make_response(jsonify({"message": "user added"}), 201)
 
 # Delete a user
 # only an admin can delete a user
@@ -113,14 +115,14 @@ def del_user(userid):
     if not is_admin():
         return make_response(jsonify({"error": "Forbidden"}), 403)
     
-    for user in users:
-        if str(user["id"]) == str(userid):
-            users.remove(user)
-            write(users)
-            return make_response(jsonify(user),200)
+    user = collection.find_one_and_delete(
+        {"id": userid},
+        {"_id": 0}
+    )
+    if user is None:
+        return make_response(jsonify({"error": "user ID not found"}), 404)
 
-    res = make_response(jsonify({"error":"user ID not found"}),404)
-    return res
+    return make_response(jsonify(user), 200)
 
 
 if __name__ == "__main__":
